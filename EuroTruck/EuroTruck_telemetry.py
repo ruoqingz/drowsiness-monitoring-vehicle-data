@@ -3,6 +3,7 @@ import requests
 import csv
 import aiohttp
 import asyncio
+import datetime
 
 
 async def get_data(url):
@@ -20,7 +21,7 @@ async def write_data(data):
         print("Game connected")
         with open("telemetry.csv", "a", newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([data["game"]["time"], data["game"]["timeScale"],
+            writer.writerow([datetime.datetime.now(),data["game"]["time"], data["game"]["timeScale"],
                              data["truck"]["speed"], data["truck"]["cruiseControlSpeed"],
                              data["truck"]["cruiseControlOn"],
                              data["truck"]["userSteer"], data["truck"]["userThrottle"], data["truck"]["userBrake"],
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     with open("telemetry.csv", "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["time", "timeScale", "speed", "cruiseControlSpeed", "cruiseControlOn", "userSteer", "userThrottle",
+            ["realwordTime","time", "timeScale", "speed", "cruiseControlSpeed", "cruiseControlOn", "userSteer", "userThrottle",
              "userBrake",
              "gameSteer", "placement_x", "placement_y", "acceleration_x", "acceleration_y"])
 
