@@ -39,8 +39,13 @@ async def job(url):
 
 async def main(url):
     while True:
-        await job(url)
-        await asyncio.sleep(0.01)
+        start_time = asyncio.get_event_loop().time()
+        await asyncio.gather(job(url), asyncio.sleep(0.1))
+        end_time = asyncio.get_event_loop().time()
+        elapsed = end_time - start_time
+        if elapsed < 0.1:
+            await asyncio.sleep(0.1 - elapsed)
+
 
 if __name__ == '__main__':
     url = "http://localhost:25555/api/ets2/telemetry"
