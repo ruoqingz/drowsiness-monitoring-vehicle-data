@@ -4,7 +4,7 @@ import asyncio
 import datetime
 
 
-async def get_data(session,url):
+async def get_data(session, url):
     async with session.get(url) as response:
         if response.status == 200:
             return await response.json()
@@ -18,14 +18,14 @@ async def write_data(data):
     async with lock:
         if data["game"]["connected"]:
             print("Game connected")
-            with open("telemetry.csv", "a", newline='') as f:
+            with open(name, "a", newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow([datetime.datetime.now(),data["game"]["time"], data["game"]["timeScale"],
+                writer.writerow([datetime.datetime.now(), data["game"]["time"], data["game"]["timeScale"],
                                  data["truck"]["speed"], data["truck"]["cruiseControlSpeed"],
                                  data["truck"]["cruiseControlOn"],
                                  data["truck"]["userSteer"], data["truck"]["userThrottle"], data["truck"]["userBrake"],
                                  data["truck"]["gameSteer"], data["truck"]["placement"]["x"],
-                                 data["truck"]["placement"]["y"],
+                                 data["truck"]["placement"]["y"],data["truck"]["placement"]["heading"],
                                  data["truck"]["acceleration"]["x"], data["truck"]["acceleration"]["y"]])
 
         else:
@@ -34,12 +34,12 @@ async def write_data(data):
 
 async def job(session, url):
     while True:
-        asyncio.create_task(get_and_write_data(session,url))
-        await asyncio.sleep(0.1)
+        asyncio.create_task(get_and_write_data(session, url))
+        await asyncio.sleep(0.025)
 
 
-async def get_and_write_data(session,url):
-    game_data = await get_data(session,url)
+async def get_and_write_data(session, url):
+    game_data = await get_data(session, url)
     await write_data(game_data)
 
 
@@ -49,16 +49,15 @@ async def main(url):
 
 
 if __name__ == '__main__':
-    url = "http://localhost:25555/api/ets2/telemetry"
-    with open("telemetry.csv", "w", newline='') as f:
+    # 10.130.21.233 is the IP address of the server
+    url = "http://10.130.21.233:25555/api/ets2/telemetry"
+    name="telemetry_3.csv"
+    with open(name, "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["realwordTime","time", "timeScale", "speed", "cruiseControlSpeed", "cruiseControlOn", "userSteer", "userThrottle",
+            ["realwordTime", "time", "timeScale", "speed", "cruiseControlSpeed", "cruiseControlOn", "userSteer",
+             "userThrottle",
              "userBrake",
-             "gameSteer", "placement_x", "placement_y", "acceleration_x", "acceleration_y"])
+             "gameSteer", "placement_x", "placement_y","placement_yaw", "acceleration_x", "acceleration_y"])
     lock = asyncio.Lock()
     asyncio.run(main(url))
-
-
-
-
