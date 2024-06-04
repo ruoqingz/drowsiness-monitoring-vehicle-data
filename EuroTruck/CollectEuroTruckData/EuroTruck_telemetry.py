@@ -51,7 +51,7 @@ async def main(url):
 if __name__ == '__main__':
     # 10.130.21.233 is the IP address of the server
     url = "http://10.130.21.233:25555/api/ets2/telemetry"
-    name="telemetry_3.csv"
+    name="telemetry_0604_4_michele.csv"
     with open(name, "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow(
