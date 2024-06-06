@@ -19,25 +19,32 @@ def ground_truth_sep(ground_truth, size, step):
     awake_window = {}
     light_drowsy_window = {}
     drowsy_window = {}
+    general_window = {}
     for name in ground_truth.keys():
         awake_window[name] = []
         light_drowsy_window[name] = []
         drowsy_window[name] = []
+        general_window[name] = []
         i = 0
         while i < len(ground_truth[name]) - size:
             if all(x == 1 for x in ground_truth[name][i:i + size]):
                 awake_window[name].append([i + j for j in range(0, size)])
+                general_window[name].append([i + j for j in range(0, size)])
                 i = i + step
             elif all(x == 2 or x == 3 for x in ground_truth[name][i:i + size]):
                 light_drowsy_window[name].append([i + j for j in range(0, size)])
+                general_window[name].append([i + j for j in range(0, size)])
                 i = i + step
             elif all(x == 4 for x in ground_truth[name][i:i + size]):
                 drowsy_window[name].append([i + j for j in range(0, size)])
+                general_window[name].append([i + j for j in range(0, size)])
                 i = i + step
             else:
                 i = i + 1
-
-    return awake_window, light_drowsy_window, drowsy_window
+        awake_window[name] = set(tuple(x) for x in awake_window[name])
+        light_drowsy_window[name] = set(tuple(x) for x in light_drowsy_window[name])
+        drowsy_window[name] = set(tuple(x) for x in drowsy_window[name])
+    return awake_window, light_drowsy_window, drowsy_window, general_window
 
 
 if __name__ == "__main__":
