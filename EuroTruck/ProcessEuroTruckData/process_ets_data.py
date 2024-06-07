@@ -26,16 +26,22 @@ class TelemetryData:
         for time in self.table:
             if len(self.table[time]["SWA_data"]) < rate:
                 rate = len(self.table[time]["SWA_data"])
-        return rate
+        return 30  #I changed here to force the rate to be 30
 
     def trim_variable_length(self, variable_name, length):
         for time in self.table:
             self.table[time][variable_name] = self.table[time][variable_name][:length]
 
 
+def standardize_data(data):
+    mean = data.mean()
+    std = data.std()
+    return (data - mean) / std
+
+
 def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     telemetry_data = TelemetryData(volunteer_name)
-    slot=[]
+    slot = []
     datetime_start = []
     datetime_end = []
     for index, row in dataframe_ets.iterrows():  # iterate through each row in the dataframe
@@ -55,12 +61,19 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     for i in range(0, len(slot), 2):
         start = slot[i]
         end = slot[i + 1]
+        dataframe_ets.loc[start:end, "userSteer"] = standardize_data(dataframe_ets.loc[start:end, "userSteer"])
+        dataframe_ets.loc[start:end, "userSteer_derivative"] = standardize_data(
+            dataframe_ets.loc[start:end, "userSteer_derivative"])
+        dataframe_ets.loc[start:end, "placement_y"] = standardize_data(dataframe_ets.loc[start:end, "placement_y"])
+        dataframe_ets.loc[start:end, "acceleration_y"] = standardize_data(
+            dataframe_ets.loc[start:end, "acceleration_y"])
         for index, row in dataframe_ets.iloc[start:end].iterrows():
             datetime_current = row["realwordTime"]
             telemetry_data.add(datetime_current.replace(microsecond=0), "SWA_data", row["userSteer"])
             telemetry_data.add(datetime_current.replace(microsecond=0), "SWV_data", row["userSteer_derivative"])
             telemetry_data.add(datetime_current.replace(microsecond=0), "lateral_displacement_data", row["placement_y"])
-            telemetry_data.add(datetime_current.replace(microsecond=0), "lateral_acceleration_data", row["acceleration_y"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "lateral_acceleration_data",
+                               row["acceleration_y"])
             # telemetry_data.add(datetime_current.replace(microsecond=0), "YA_data", row["placement_yaw"])
 
     for item in datetime_start:
@@ -68,7 +81,7 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     for item in datetime_end:
         telemetry_data.delete(item.replace(microsecond=0))
 
-    min_rate=telemetry_data.get_min_sampling_rate()
+    min_rate = telemetry_data.get_min_sampling_rate()
     telemetry_data.trim_variable_length("SWA_data", min_rate)
     telemetry_data.trim_variable_length("SWV_data", min_rate)
     telemetry_data.trim_variable_length("lateral_displacement_data", min_rate)
@@ -96,17 +109,33 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     return telemetry_data
 
 
+def prepare_export_data(telemetry_files, predictS_files, name):
+    ets_data_list = [pd.read_csv(file) for file in telemetry_files]
+    ets_data = pd.concat(ets_data_list, ignore_index=True)
+
+    ets_data["realwordTime"] = pd.to_datetime(ets_data["realwordTime"])
+    ets_data['time_Diff'] = ets_data['realwordTime'].diff().dt.total_seconds()
+    ets_data['userSteer_derivative'] = ets_data['userSteer'].diff() / ets_data['time_Diff']
+
+    ground_truth_data_list = [pd.read_excel(file, engine='openpyxl') for file in predictS_files]
+    ground_truth_data = pd.concat(ground_truth_data_list, ignore_index=True)
+    data = process_data(ets_data, ground_truth_data, name)
+    return data
+
+
 os.chdir("/Users/ruotsing/PycharmProjects/DMS/EuroTruck/ProcessEuroTruckData")
-csv_files = ["telemetry_1.csv", "telemetry_2.csv", "telemetry_3.csv"]
-name = "ruoqing"
-ets_data_list = [pd.read_csv(file) for file in csv_files]
-ets_data = pd.concat(ets_data_list, ignore_index=True)
+csv_files_rq = ["telemetry_0530_1_rq.csv", "telemetry_0530_2_rq.csv", "telemetry_0530_3_rq.csv",
+                "telemetry_0531_1_rq.csv",
+                "telemetry_0531_2_rq.csv", "telemetry_0531_3_rq.csv", "telemetry_0531_4_rq.csv",
+                "telemetry_0531_5_rq.csv"]
+csv_files_michele = ["telemetry_0604_1_michele.csv", "telemetry_0604_2_michele.csv", "telemetry_0604_3_michele.csv",
+                     "telemetry_0604_4_michele.csv"]
+csv_files = csv_files_rq + csv_files_michele
 
-ets_data["realwordTime"] = pd.to_datetime(ets_data["realwordTime"])
-ets_data['time_Diff'] = ets_data['realwordTime'].diff().dt.total_seconds()
-ets_data['userSteer_derivative'] = ets_data['userSteer'].diff() / ets_data['time_Diff']
-# ets_data['placement_yaw_derivative'] = ets_data['placement_yaw'].diff() / ets_data['time_Diff']
+ground_truth_data_files_rq = ["device_history_0530_rq.xlsx", "device_history_0531_rq.xlsx"]
+ground_truth_data_files_michele = ["device_history_0604_michele.xlsx"]
+ground_truth_data_files = ground_truth_data_files_rq + ground_truth_data_files_michele
 
-ground_truth_data = pd.read_excel("device_history_ruoqing.xlsx", engine='openpyxl')
-data = process_data(ets_data, ground_truth_data, name)
-
+data_rq = prepare_export_data(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
+data_michele = prepare_export_data(csv_files_michele, ground_truth_data_files_michele, "michele")
+data_group = prepare_export_data(csv_files, ground_truth_data_files, "ruoqing+michele")
