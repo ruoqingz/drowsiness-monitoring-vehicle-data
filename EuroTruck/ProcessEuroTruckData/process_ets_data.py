@@ -61,12 +61,12 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     for i in range(0, len(slot), 2):
         start = slot[i]
         end = slot[i + 1]
-        dataframe_ets.loc[start:end, "userSteer"] = standardize_data(dataframe_ets.loc[start:end, "userSteer"])
+        dataframe_ets.loc[start:end, "userSteer"] = standardize_data(dataframe_ets.loc[start:end, "userSteer"].fillna(0))
         dataframe_ets.loc[start:end, "userSteer_derivative"] = standardize_data(
             dataframe_ets.loc[start:end, "userSteer_derivative"])
-        dataframe_ets.loc[start:end, "placement_y"] = standardize_data(dataframe_ets.loc[start:end, "placement_y"])
+        dataframe_ets.loc[start:end, "placement_y"] = standardize_data(dataframe_ets.loc[start:end, "placement_y"].fillna(0))
         dataframe_ets.loc[start:end, "acceleration_y"] = standardize_data(
-            dataframe_ets.loc[start:end, "acceleration_y"])
+            dataframe_ets.loc[start:end, "acceleration_y"].fillna(0))
         for index, row in dataframe_ets.iloc[start:end].iterrows():
             datetime_current = row["realwordTime"]
             telemetry_data.add(datetime_current.replace(microsecond=0), "SWA_data", row["userSteer"])
@@ -115,10 +115,12 @@ def prepare_export_data(telemetry_files, predictS_files, name):
 
     ets_data["realwordTime"] = pd.to_datetime(ets_data["realwordTime"])
     ets_data['time_Diff'] = ets_data['realwordTime'].diff().dt.total_seconds()
+    ets_data=ets_data[ets_data['time_Diff'] > 0].reset_index(drop=True)
     ets_data['userSteer_derivative'] = ets_data['userSteer'].diff() / ets_data['time_Diff']
 
     ground_truth_data_list = [pd.read_excel(file, engine='openpyxl') for file in predictS_files]
     ground_truth_data = pd.concat(ground_truth_data_list, ignore_index=True)
+    ground_truth_data=ground_truth_data.drop_duplicates(subset=['TIME'], keep='first').reset_index(drop=True)
     data = process_data(ets_data, ground_truth_data, name)
     return data
 
@@ -130,12 +132,16 @@ csv_files_rq = ["telemetry_0530_1_rq.csv", "telemetry_0530_2_rq.csv", "telemetry
                 "telemetry_0531_5_rq.csv"]
 csv_files_michele = ["telemetry_0604_1_michele.csv", "telemetry_0604_2_michele.csv", "telemetry_0604_3_michele.csv",
                      "telemetry_0604_4_michele.csv"]
-csv_files = csv_files_rq + csv_files_michele
+csv_files_sara= ["telemetry_0607_1_sara.csv", "telemetry_0607_2_sara.csv"]
+csv_files = csv_files_rq + csv_files_michele + csv_files_sara
 
 ground_truth_data_files_rq = ["device_history_0530_rq.xlsx", "device_history_0531_rq.xlsx"]
 ground_truth_data_files_michele = ["device_history_0604_michele.xlsx"]
-ground_truth_data_files = ground_truth_data_files_rq + ground_truth_data_files_michele
+ground_truth_data_files_sara = ["device_history_0607_sara.xlsx"]
+ground_truth_data_files = ground_truth_data_files_rq + ground_truth_data_files_michele + ground_truth_data_files_sara
+
 
 data_rq = prepare_export_data(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
 data_michele = prepare_export_data(csv_files_michele, ground_truth_data_files_michele, "michele")
-data_group = prepare_export_data(csv_files, ground_truth_data_files, "ruoqing+michele")
+data_sara = prepare_export_data(csv_files_sara, ground_truth_data_files_sara, "sara")
+data_group = prepare_export_data(csv_files, ground_truth_data_files, "ruoqing+michele+sara")
