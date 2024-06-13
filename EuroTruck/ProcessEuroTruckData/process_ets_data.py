@@ -1,7 +1,6 @@
 # this model is to make the data from the csv file into a dictionary
 import pandas as pd
 import datetime
-import pickle
 import os
 
 
@@ -39,7 +38,20 @@ def standardize_data(data):
     return (data - mean) / std
 
 
-def process_data(dataframe_ets, dataframe_sw, volunteer_name):
+def rewrite_dataframe_sw(dataframe_sw):
+    pd.set_option('future.no_silent_downcasting', True)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('CALIBRATE', 0)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('AWAKE', 1)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('WEARY', 2)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('FATIGUED', 3)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('DROWSY', 4)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('Not valid!', -1)
+    dataframe_sw['DS'] = dataframe_sw['DS'].replace('OFFWRIST', -1)
+
+    return dataframe_sw
+
+
+def process_data_cruisecontrol(dataframe_ets, dataframe_sw, volunteer_name):
     telemetry_data = TelemetryData(volunteer_name)
     slot = []
     datetime_start = []
@@ -61,10 +73,12 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     for i in range(0, len(slot), 2):
         start = slot[i]
         end = slot[i + 1]
-        dataframe_ets.loc[start:end, "userSteer"] = standardize_data(dataframe_ets.loc[start:end, "userSteer"].fillna(0))
+        dataframe_ets.loc[start:end, "userSteer"] = standardize_data(
+            dataframe_ets.loc[start:end, "userSteer"].fillna(0))
         dataframe_ets.loc[start:end, "userSteer_derivative"] = standardize_data(
             dataframe_ets.loc[start:end, "userSteer_derivative"])
-        dataframe_ets.loc[start:end, "placement_y"] = standardize_data(dataframe_ets.loc[start:end, "placement_y"].fillna(0))
+        dataframe_ets.loc[start:end, "placement_y"] = standardize_data(
+            dataframe_ets.loc[start:end, "placement_y"].fillna(0))
         dataframe_ets.loc[start:end, "acceleration_y"] = standardize_data(
             dataframe_ets.loc[start:end, "acceleration_y"].fillna(0))
         for index, row in dataframe_ets.iloc[start:end].iterrows():
@@ -88,14 +102,7 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     telemetry_data.trim_variable_length("lateral_acceleration_data", min_rate)
     # telemetry_data.trim_variable_length("YA_data", min_rate)
 
-    pd.set_option('future.no_silent_downcasting', True)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('CALIBRATE', 0)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('AWAKE', 1)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('WEARY', 2)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('FATIGUED', 3)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('DROWSY', 4)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('Not valid!', -1)
-    dataframe_sw['DS'] = dataframe_sw['DS'].replace('OFFWRIST', -1)
+    dataframe_sw = rewrite_dataframe_sw(dataframe_sw)
     date_format_sw = "%Y-%m-%d %H:%M:%S"
     for index, row in dataframe_sw.iterrows():
         datetime_current = datetime.datetime.strptime(row["TIME"], date_format_sw)
@@ -109,19 +116,119 @@ def process_data(dataframe_ets, dataframe_sw, volunteer_name):
     return telemetry_data
 
 
-def prepare_export_data(telemetry_files, predictS_files, name):
+def process_data_pedal(dataframe_ets, dataframe_sw, volunteer_name):
+    telemetry_data = TelemetryData(volunteer_name)
+    slot = []
+    datetime_start = []
+    datetime_end = []
+    for index, row in dataframe_ets.iterrows():  # iterate through each row in the dataframe
+        if index > 0:
+            prev_row = dataframe_ets.iloc[index - 1]
+            if ((row["timeScale"] == 19.0 and prev_row["timeScale"] == 3.0) or (
+                    prev_row["timeScale"] == 19.0 and index == 1)):
+                # get the start time when get on the highway
+                datetime_start.append(row["realwordTime"])
+                slot.append(index)
+
+            if ((row["timeScale"] == 3.0 and prev_row["timeScale"] == 19.0) or
+                    (index == len(dataframe_ets) - 1 and row["timeScale"] == 19.0)):
+                # get the end time when get on the highway
+                datetime_end.append(prev_row["realwordTime"])
+                slot.append(index)
+
+    for i in range(0, len(slot), 2):
+        start = slot[i]
+        end = slot[i + 1]
+        dataframe_ets.loc[start:end, "userSteer"] = standardize_data(
+            dataframe_ets.loc[start:end, "userSteer"])
+        dataframe_ets.loc[start:end, "userSteer_derivative"] = standardize_data(
+            dataframe_ets.loc[start:end, "userSteer_derivative"])
+        dataframe_ets.loc[start:end, "placement_y"] = standardize_data(
+            dataframe_ets.loc[start:end, "placement_y"])
+        dataframe_ets.loc[start:end, "acceleration_y"] = standardize_data(
+            dataframe_ets.loc[start:end, "acceleration_y"])
+
+        mask = (dataframe_ets.index >= start) & (dataframe_ets.index < end) & (
+                dataframe_ets["cruiseControlOn"] == False)
+        dataframe_ets.loc[start:end, "userThrottle_derivative"] = standardize_data(
+            dataframe_ets.loc[mask, "userThrottle_derivative"])
+        dataframe_ets.loc[start:end, "userBrake_derivative"] = standardize_data(
+            dataframe_ets.loc[mask, "userBrake_derivative"])
+        dataframe_ets.loc[start:end, "userThrottle_derivative"] = dataframe_ets.loc[start:end, "userThrottle_derivative"].fillna(0)
+        dataframe_ets.loc[start:end, "userBrake_derivative"] = dataframe_ets.loc[start:end, "userBrake_derivative"].fillna(0)
+
+        for index, row in dataframe_ets.iloc[start:end].iterrows():
+            datetime_current = row["realwordTime"]
+            telemetry_data.add(datetime_current.replace(microsecond=0), "SWA_data", row["userSteer"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "SWV_data", row["userSteer_derivative"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "lateral_displacement_data", row["placement_y"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "lateral_acceleration_data",
+                               row["acceleration_y"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "Throttle_velocity",
+                               row["userThrottle_derivative"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "Brake_velocity",
+                               row["userBrake_derivative"])
+
+    for item in datetime_start:
+        telemetry_data.delete(item.replace(microsecond=0))
+    for item in datetime_end:
+        telemetry_data.delete(item.replace(microsecond=0))
+
+    min_rate = telemetry_data.get_min_sampling_rate()
+    telemetry_data.trim_variable_length("SWA_data", min_rate)
+    telemetry_data.trim_variable_length("SWV_data", min_rate)
+    telemetry_data.trim_variable_length("lateral_displacement_data", min_rate)
+    telemetry_data.trim_variable_length("lateral_acceleration_data", min_rate)
+    telemetry_data.trim_variable_length("Throttle_velocity", min_rate)
+    telemetry_data.trim_variable_length("Brake_velocity", min_rate)
+
+    dataframe_sw = rewrite_dataframe_sw(dataframe_sw)
+    date_format_sw = "%Y-%m-%d %H:%M:%S"
+    for index, row in dataframe_sw.iterrows():
+        datetime_current = datetime.datetime.strptime(row["TIME"], date_format_sw)
+        if datetime_current in telemetry_data.table.keys():
+            telemetry_data.add(datetime_current, "groud_truth", row["DS"])
+
+    # there could be gap in ground truth but I hope there is no
+    # 假设 telemetry_data.table 是需要处理的字典
+    telemetry_data.table = {time: data for time, data in telemetry_data.table.items() if len(data) >= 7}
+
+    return telemetry_data
+
+
+def prepare_export_data_cruisecontrol(telemetry_files, predictS_files, name):
     ets_data_list = [pd.read_csv(file) for file in telemetry_files]
     ets_data = pd.concat(ets_data_list, ignore_index=True)
 
     ets_data["realwordTime"] = pd.to_datetime(ets_data["realwordTime"])
     ets_data['time_Diff'] = ets_data['realwordTime'].diff().dt.total_seconds()
-    ets_data=ets_data[ets_data['time_Diff'] > 0].reset_index(drop=True)
+    ets_data = ets_data[ets_data['time_Diff'] > 0].reset_index(drop=True)
     ets_data['userSteer_derivative'] = ets_data['userSteer'].diff() / ets_data['time_Diff']
 
     ground_truth_data_list = [pd.read_excel(file, engine='openpyxl') for file in predictS_files]
     ground_truth_data = pd.concat(ground_truth_data_list, ignore_index=True)
-    ground_truth_data=ground_truth_data.drop_duplicates(subset=['TIME'], keep='first').reset_index(drop=True)
-    data = process_data(ets_data, ground_truth_data, name)
+    ground_truth_data = ground_truth_data.drop_duplicates(subset=['TIME'], keep='first').reset_index(drop=True)
+    data = process_data_cruisecontrol(ets_data, ground_truth_data, name)
+
+    return data
+
+
+def prepare_export_data_pedal(telemetry_files, predictS_files, name):
+    ets_data_list = [pd.read_csv(file) for file in telemetry_files]
+    ets_data = pd.concat(ets_data_list, ignore_index=True)
+
+    ets_data["realwordTime"] = pd.to_datetime(ets_data["realwordTime"])
+    ets_data['time_Diff'] = ets_data['realwordTime'].diff().dt.total_seconds()
+    ets_data = ets_data[ets_data['time_Diff'] > 0].reset_index(drop=True)
+    ets_data['userSteer_derivative'] = ets_data['userSteer'].diff() / ets_data['time_Diff']
+    ets_data['userThrottle_derivative'] = ets_data['userThrottle'].diff() / ets_data['time_Diff']
+    ets_data['userBrake_derivative'] = ets_data['userBrake'].diff() / ets_data['time_Diff']
+
+    ground_truth_data_list = [pd.read_excel(file, engine='openpyxl') for file in predictS_files]
+    ground_truth_data = pd.concat(ground_truth_data_list, ignore_index=True)
+    ground_truth_data = ground_truth_data.drop_duplicates(subset=['TIME'], keep='first').reset_index(drop=True)
+
+    data = process_data_pedal(ets_data, ground_truth_data, name)
     return data
 
 
@@ -132,7 +239,7 @@ csv_files_rq = ["telemetry_0530_1_rq.csv", "telemetry_0530_2_rq.csv", "telemetry
                 "telemetry_0531_5_rq.csv"]
 csv_files_michele = ["telemetry_0604_1_michele.csv", "telemetry_0604_2_michele.csv", "telemetry_0604_3_michele.csv",
                      "telemetry_0604_4_michele.csv"]
-csv_files_sara= ["telemetry_0607_1_sara.csv", "telemetry_0607_2_sara.csv"]
+csv_files_sara = ["telemetry_0607_1_sara.csv", "telemetry_0607_2_sara.csv"]
 csv_files = csv_files_rq + csv_files_michele + csv_files_sara
 
 ground_truth_data_files_rq = ["device_history_0530_rq.xlsx", "device_history_0531_rq.xlsx"]
@@ -140,8 +247,9 @@ ground_truth_data_files_michele = ["device_history_0604_michele.xlsx"]
 ground_truth_data_files_sara = ["device_history_0607_sara.xlsx"]
 ground_truth_data_files = ground_truth_data_files_rq + ground_truth_data_files_michele + ground_truth_data_files_sara
 
-
-data_rq = prepare_export_data(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
-data_michele = prepare_export_data(csv_files_michele, ground_truth_data_files_michele, "michele")
-data_sara = prepare_export_data(csv_files_sara, ground_truth_data_files_sara, "sara")
-data_group = prepare_export_data(csv_files, ground_truth_data_files, "ruoqing+michele+sara")
+data_rq_cc = prepare_export_data_cruisecontrol(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
+data_rq_pd = prepare_export_data_pedal(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
+data_michele_cc = prepare_export_data_cruisecontrol(csv_files_michele, ground_truth_data_files_michele, "michele")
+data_michele_pd = prepare_export_data_pedal(csv_files_michele, ground_truth_data_files_michele, "michele")
+data_sara_cc = prepare_export_data_cruisecontrol(csv_files_sara, ground_truth_data_files_sara, "sara")
+data_sara_pd = prepare_export_data_pedal(csv_files_sara, ground_truth_data_files_sara, "sara")
