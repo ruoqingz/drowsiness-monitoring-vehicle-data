@@ -25,7 +25,11 @@ class TelemetryData:
         for time in self.table:
             if len(self.table[time]["SWA_data"]) < rate:
                 rate = len(self.table[time]["SWA_data"])
-        return 30  #I changed here to force the rate to be 30
+        # if rate < 30:
+        #     return rate
+        # else:
+        #     return 30
+        return 30
 
     def trim_variable_length(self, variable_name, length):
         for time in self.table:
@@ -154,8 +158,10 @@ def process_data_pedal(dataframe_ets, dataframe_sw, volunteer_name):
             dataframe_ets.loc[mask, "userThrottle_derivative"])
         dataframe_ets.loc[start:end, "userBrake_derivative"] = standardize_data(
             dataframe_ets.loc[mask, "userBrake_derivative"])
-        dataframe_ets.loc[start:end, "userThrottle_derivative"] = dataframe_ets.loc[start:end, "userThrottle_derivative"].fillna(0)
-        dataframe_ets.loc[start:end, "userBrake_derivative"] = dataframe_ets.loc[start:end, "userBrake_derivative"].fillna(0)
+        dataframe_ets.loc[start:end, "userThrottle_derivative"] = dataframe_ets.loc[start:end,
+                                                                  "userThrottle_derivative"].fillna(0)
+        dataframe_ets.loc[start:end, "userBrake_derivative"] = dataframe_ets.loc[start:end,
+                                                               "userBrake_derivative"].fillna(0)
 
         for index, row in dataframe_ets.iloc[start:end].iterrows():
             datetime_current = row["realwordTime"]
@@ -168,11 +174,14 @@ def process_data_pedal(dataframe_ets, dataframe_sw, volunteer_name):
                                row["userThrottle_derivative"])
             telemetry_data.add(datetime_current.replace(microsecond=0), "Brake_velocity",
                                row["userBrake_derivative"])
+            telemetry_data.add(datetime_current.replace(microsecond=0), "cruiseControlOn", row["cruiseControlOn"])
 
     for item in datetime_start:
         telemetry_data.delete(item.replace(microsecond=0))
     for item in datetime_end:
         telemetry_data.delete(item.replace(microsecond=0))
+
+
 
     min_rate = telemetry_data.get_min_sampling_rate()
     telemetry_data.trim_variable_length("SWA_data", min_rate)
@@ -181,6 +190,7 @@ def process_data_pedal(dataframe_ets, dataframe_sw, volunteer_name):
     telemetry_data.trim_variable_length("lateral_acceleration_data", min_rate)
     telemetry_data.trim_variable_length("Throttle_velocity", min_rate)
     telemetry_data.trim_variable_length("Brake_velocity", min_rate)
+    telemetry_data.trim_variable_length("cruiseControlOn", min_rate)
 
     dataframe_sw = rewrite_dataframe_sw(dataframe_sw)
     date_format_sw = "%Y-%m-%d %H:%M:%S"
@@ -191,7 +201,7 @@ def process_data_pedal(dataframe_ets, dataframe_sw, volunteer_name):
 
     # there could be gap in ground truth but I hope there is no
     # 假设 telemetry_data.table 是需要处理的字典
-    telemetry_data.table = {time: data for time, data in telemetry_data.table.items() if len(data) >= 7}
+    telemetry_data.table = {time: data for time, data in telemetry_data.table.items() if len(data) >= 8}
 
     return telemetry_data
 
