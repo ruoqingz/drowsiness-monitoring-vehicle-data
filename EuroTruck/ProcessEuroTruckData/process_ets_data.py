@@ -250,12 +250,14 @@ csv_files_rq = ["telemetry_0530_1_rq.csv", "telemetry_0530_2_rq.csv", "telemetry
 csv_files_michele = ["telemetry_0604_1_michele.csv", "telemetry_0604_2_michele.csv", "telemetry_0604_3_michele.csv",
                      "telemetry_0604_4_michele.csv"]
 csv_files_sara = ["telemetry_0607_1_sara.csv", "telemetry_0607_2_sara.csv"]
-csv_files = csv_files_rq + csv_files_michele + csv_files_sara
+csv_files_catia= ["telemetry_0614_1_catia.csv", "telemetry_0614_2_catia.csv"]
+csv_files = csv_files_rq + csv_files_michele + csv_files_sara + csv_files_catia
 
 ground_truth_data_files_rq = ["device_history_0530_rq.xlsx", "device_history_0531_rq.xlsx"]
 ground_truth_data_files_michele = ["device_history_0604_michele.xlsx"]
 ground_truth_data_files_sara = ["device_history_0607_sara.xlsx"]
-ground_truth_data_files = ground_truth_data_files_rq + ground_truth_data_files_michele + ground_truth_data_files_sara
+ground_truth_data_files_catia = ["device_history_0614_catia.xlsx"]
+ground_truth_data_files = ground_truth_data_files_rq + ground_truth_data_files_michele + ground_truth_data_files_sara + ground_truth_data_files_catia
 
 data_rq_cc = prepare_export_data_cruisecontrol(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
 data_rq_pd = prepare_export_data_pedal(csv_files_rq, ground_truth_data_files_rq, "ruoqing")
@@ -263,3 +265,5 @@ data_michele_cc = prepare_export_data_cruisecontrol(csv_files_michele, ground_tr
 data_michele_pd = prepare_export_data_pedal(csv_files_michele, ground_truth_data_files_michele, "michele")
 data_sara_cc = prepare_export_data_cruisecontrol(csv_files_sara, ground_truth_data_files_sara, "sara")
 data_sara_pd = prepare_export_data_pedal(csv_files_sara, ground_truth_data_files_sara, "sara")
+data_catia_cc = prepare_export_data_cruisecontrol(csv_files_catia, ground_truth_data_files_catia, "catia")
+data_catia_pd = prepare_export_data_pedal(csv_files_catia, ground_truth_data_files_catia, "catia")
