@@ -1,10 +1,9 @@
 import json
 import numpy as np
-from matplotlib import pyplot as plt
 from sklearn import svm
 from sklearn.model_selection import train_test_split
 
-from random_forest import ground_truth_sep, reform_ground_truth
+from ensemble_methods.random_forest import ground_truth_sep, reform_ground_truth
 from sklearn.metrics import mutual_info_score, confusion_matrix
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
